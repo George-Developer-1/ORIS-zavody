@@ -1,29 +1,125 @@
 <!DOCTYPE html>
-<html>
+<html lang="cs">
 <head>
     <meta charset="utf-8">
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/fullcalendare>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #calendar {
+            max-width: 1200px;
+            margin-bottom: 30px;
+        }
+
+        .event {
+            padding: 6px;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
 </head>
 <body>
 
-<button onclick="loadData()">Načíst data</button>
+<h1>ORIS - závody příštích 30 dnů</h1>
 
-<pre id="out"></pre>
+<button onclick="loadEvents()">Obnovit data</button>
+
+<p id="status">Načítám...</p>
+
+<div id="calendar"></div>
+
+<h2>Seznam závodů</h2>
+
+<div id="eventList"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.al.min.jsscript>
 
 <script>
 
-async function loadData() {
+let calendar;
 
-    const res = await fetch(
-        'https://oris.ceskyorientak.cz/API/?format=json&method=getEventList'
+function formatDate(date) {
+    return date.toISOString().substring(0, 10);
+}
+
+async function loadEvents() {
+
+    document.getElementById("status").innerText = "Načítám...";
+
+    const from = new Date();
+
+    const to = new Date();
+    to.setDate(to.getDate() + 30);
+
+    const url =
+        "https://oris.ceskyorientak.cz/API/?" +
+        "format=json" +
+        "&method=getEventList" +
+        "&datefrom=" + formatDate(from) +
+        "&dateto=" + formatDate(to);
+
+    const response = await fetch(url);
+    const json = await response.json();
+
+    const events = Object.values(json.Data);
+
+    calendar.removeAllEvents();
+
+    const fcEvents = [];
+
+    const listHtml = [];
+
+    events
+        .sort((a,b) => a.Date.localeCompare(b.Date))
+        .forEach(event => {
+
+            fcEvents.push({
+                title: event.Name,
+                start: event.Date,
+                url: "https://oris.orientacnisporty.cz/Zavod?id=" + event.ID
+            });
+
+            listHtml.push(`
+                <div class="event">
+                    <b>${event.Date}</b><br>
+                    <a target="_blank"
+                       href="https://oris.orientacnisporty.cz/Zavod?id=${event.ID}">
+                       ${event.Name}
+                    </a>
+                    <br>
+                    ${event.Region}
+                    | ${event.Sport?.NameCZ ?? ""}
+                    | ${event.Level?.ShortName ?? ""}
+                </div>
+            `);
+        });
+
+    calendar.addEventSource(fcEvents);
+
+    document.getElementById("eventList").innerHTML =
+        listHtml.join("");
+
+    document.getElementById("status").innerText =
+        `Načteno ${events.length} závodů`;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    calendar = new FullCalendar.Calendar(
+        document.getElementById("calendar"),
+        {
+            initialView: "dayGridMonth",
+            locale: "cs"
+        }
     );
 
-    const json = await res.json();
+    calendar.render();
 
-    console.log(json);
-
-    document.getElementById('out').textContent =
-        JSON.stringify(json, null, 2);
-}
+    loadEvents();
+});
 
 </script>
 
