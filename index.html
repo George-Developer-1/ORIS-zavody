@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>ORIS Kalendář závodů</title>
+
+<link href="https://cdn.jsdelivr.net/npm/fullcalendarx.global.min.css
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f5f5f5;
+}
+
+h1 {
+    margin-bottom: 10px;
+}
+
+button {
+    padding: 10px 15px;
+    cursor: pointer;
+    border: none;
+    background: #0078d4;
+    color: white;
+    border-radius: 5px;
+}
+
+button:hover {
+    background: #106ebe;
+}
+
+#status {
+    margin: 10px 0;
+    color: #666;
+}
+
+#calendar {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+
+#eventList {
+    margin-top: 20px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+
+.event-row {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.event-row:last-child {
+    border-bottom: none;
+}
+
+.event-name {
+    font-weight: bold;
+}
+
+.event-date {
+    color: #666;
+}
+</style>
+</head>
+
+<body>
+
+<h1>ORIS – závody na příštích 30 dní</h1>
+
+<button onclick="loadEvents()">Obnovit data</button>
+
+<div id="status">Načítám...</div>
+
+<div id="calendar"></div>
+
+<div id="eventList">
+    <h2>Seznam závodů</h2>
+    <div id="listContent"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.netndar@6.1.18/index.global.min.jsscript>
+
+<script>
+
+let calendar;
+
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+async function loadEvents() {
+
+    try {
+
+        document.getElementById("status").innerText =
+            "Načítání dat z ORISu...";
+
+        const from = new Date();
+
+        const to = new Date();
+        to.setDate(to.getDate() + 30);
+
+        const url =
+            "https://oris.ceskyorientak.cz/API/" +
+            "?format=json" +
+            "&method=getEventList" +
+            "&datefrom=" + formatDate(from) +
+            "&dateto=" + formatDate(to) +
+            "&all=1";
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error("Chyba komunikace");
+        }
+
+        const data = await response.json();
+
+        console.log(data);
+
+        const events = [];
+
+        let sourceEvents = [];
+
+        function findEvents(obj) {
+
+            if (Array.isArray(obj)) {
+
+                obj.forEach(item => {
+
+                    if (
+                        item.ID &&
+                        (item.Name || item.name)
+                    ) {
+                        sourceEvents.push(item);
+                    }
+
+                    findEvents(item);
+                });
+
+            } else if (obj && typeof obj === "object") {
+
+                Object.values(obj).forEach(findEvents);
+            }
+        }
+
+        findEvents(data);
+
+        sourceEvents.forEach(ev => {
+
+            const eventDate =
+                ev.Date ||
+                ev.date ||
+                ev.EventDate ||
+                ev.eventDate;
+
+            const eventName =
+                ev.Name ||
+                ev.name;
+
+            const eventId =
+                ev.ID ||
+                ev.id;
+
+            if (!eventDate || !eventName) {
+                return;
+            }
+
+            events.push({
+                title: eventName,
+                start: eventDate,
+                url:
+                    "https://oris.orientacnisporty.cz/Zavod?id="
+                    + eventId
+            });
+        });
+
+        calendar.removeAllEvents();
+        calendar.addEventSource(events);
+
+        renderList(sourceEvents);
+
+        document.getElementById("status").innerText =
+            `Načteno ${events.length} závodů`;
+
+    } catch (err) {
+
+        console.error(err);
+
+        document.getElementById("status").innerText =
+            "Nepodařilo se načíst data.";
+    }
+}
+
+function renderList(events) {
+
+    const container =
+        document.getElementById("listContent");
+
+    container.innerHTML = "";
+
+    events.sort((a, b) => {
+
+        const da =
+            a.Date || a.date || "";
+
+        const db =
+            b.Date || b.date || "";
+
+        return da.localeCompare(db);
+    });
+
+    events.forEach(ev => {
+
+        const id =
+            ev.ID || ev.id;
+
+        const name =
+            ev.Name || ev.name;
+
+        const date =
+            ev.Date || ev.date;
+
+        const row =
+            document.createElement("div");
+
+        row.className = "event-row";
+
+        row.innerHTML = `
+            <div class="event-name">
+                <a target="_blank"
+                   href="https://oris.orientacnisporty.cz/Zavod?id=${id}">
+                   ${name}
+                </a>
+            </div>
+            <div class="event-date">
+                ${date}
+            </div>
+        `;
+
+        container.appendChild(row);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    calendar = new FullCalendar.Calendar(
+        document.getElementById("calendar"),
+        {
+            initialView: "dayGridMonth",
+            locale: "cs",
+
+            eventClick: function(info) {
+
+                info.jsEvent.preventDefault();
+
+                if (info.event.url) {
+                    window.open(
+                        info.event.url,
+                        "_blank"
+                    );
+                }
+            }
+        }
+    );
+
+    calendar.render();
+
+    loadEvents();
+});
+
+</script>
+
+</body>
+</html>
